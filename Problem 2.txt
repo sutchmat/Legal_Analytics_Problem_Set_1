@@ -1,0 +1,144 @@
+> wine = read.csv("http://www.nd.edu/~mclark19/learn/data/goodwine.csv")
+> summary(wine)
+ fixed.acidity    volatile.acidity  citric.acid     residual.sugar     chlorides       free.sulfur.dioxide
+ Min.   : 3.800   Min.   :0.0800   Min.   :0.0000   Min.   : 0.600   Min.   :0.00900   Min.   :  1.00     
+ 1st Qu.: 6.400   1st Qu.:0.2300   1st Qu.:0.2500   1st Qu.: 1.800   1st Qu.:0.03800   1st Qu.: 17.00     
+ Median : 7.000   Median :0.2900   Median :0.3100   Median : 3.000   Median :0.04700   Median : 29.00     
+ Mean   : 7.215   Mean   :0.3397   Mean   :0.3186   Mean   : 5.443   Mean   :0.05603   Mean   : 30.53     
+ 3rd Qu.: 7.700   3rd Qu.:0.4000   3rd Qu.:0.3900   3rd Qu.: 8.100   3rd Qu.:0.06500   3rd Qu.: 41.00     
+ Max.   :15.900   Max.   :1.5800   Max.   :1.6600   Max.   :65.800   Max.   :0.61100   Max.   :289.00     
+ total.sulfur.dioxide    density             pH          sulphates         alcohol         quality        color     
+ Min.   :  6.0        Min.   :0.9871   Min.   :2.720   Min.   :0.2200   Min.   : 8.00   Min.   :3.000   red  :1599  
+ 1st Qu.: 77.0        1st Qu.:0.9923   1st Qu.:3.110   1st Qu.:0.4300   1st Qu.: 9.50   1st Qu.:5.000   white:4898  
+ Median :118.0        Median :0.9949   Median :3.210   Median :0.5100   Median :10.30   Median :6.000               
+ Mean   :115.7        Mean   :0.9947   Mean   :3.219   Mean   :0.5313   Mean   :10.49   Mean   :5.818               
+ 3rd Qu.:156.0        3rd Qu.:0.9970   3rd Qu.:3.320   3rd Qu.:0.6000   3rd Qu.:11.30   3rd Qu.:6.000               
+ Max.   :440.0        Max.   :1.0390   Max.   :4.010   Max.   :2.0000   Max.   :14.90   Max.   :9.000               
+     white          good     
+ Min.   :0.0000   Bad :2384  
+ 1st Qu.:1.0000   Good:4113  
+ Median :1.0000              
+ Mean   :0.7539              
+ 3rd Qu.:1.0000              
+ Max.   :1.0000              
+> install.packages("doSNOW")
+Installing package into ‘C:/Users/Matt/Documents/R/win-library/3.0’
+(as ‘lib’ is unspecified)
+trying URL 'http://cran.rstudio.com/bin/windows/contrib/3.0/doSNOW_1.0.11.zip'
+Content type 'application/zip' length 17197 bytes (16 Kb)
+opened URL
+downloaded 16 Kb
+
+package ‘doSNOW’ successfully unpacked and MD5 sums checked
+
+The downloaded binary packages are in
+	C:\Users\Matt\AppData\Local\Temp\RtmpIX54zC\downloaded_packages
+> library(doSNOW)
+Loading required package: foreach
+foreach: simple, scalable parallel programming from Revolution Analytics
+Use Revolution R for scalability, fault tolerance and more.
+http://www.revolutionanalytics.com
+Loading required package: iterators
+Loading required package: snow
+> registerDoSNOW(makeCluster(3, type="SOCK"))
+> install.packages("corrplot")
+Installing package into ‘C:/Users/Matt/Documents/R/win-library/3.0’
+(as ‘lib’ is unspecified)
+trying URL 'http://cran.rstudio.com/bin/windows/contrib/3.0/corrplot_0.73.zip'
+Content type 'application/zip' length 2680428 bytes (2.6 Mb)
+opened URL
+downloaded 2.6 Mb
+
+package ‘corrplot’ successfully unpacked and MD5 sums checked
+
+The downloaded binary packages are in
+	C:\Users\Matt\AppData\Local\Temp\RtmpIX54zC\downloaded_packages
+> library(corrplot)
+> corrplot(cor(wine[, -c(13, 15)]), method = "number", tl.cex = 0.5)
+> library(caret)
+Loading required package: lattice
+Loading required package: ggplot2
+> set.seed(1234)
+> trainIndices = createDataPartition(wine$good, p = 0.8, list = F)
+> wanted = !colnames(wine) %in% c("free.sulfur.dioxide", "density", "quality", "color", "white")
+> wine_train = wine[trainIndices, wanted]
+> wine_test = wine[-trainIndices, wanted]
+> wine_trainplot = predict(preProcess(wine_train[,-10], method="range"),
++                          wine_train[,-10])
+> featurePlot(wine_trainplot, wine_train$good, "box")
+> set.seed(1234)
+> cv_opts = trainControl(method="cv", number=10)
+> knn_opts = data.frame(.k=c(seq(3, 11, 2), 25, 51, 101))
+> results_knn = train(good~., data=wine_train, method="knn", preProcess="range", trControl=cv_opts, tuneGrid = knn_opts)
+Loading required package: class
+> results_knn
+k-Nearest Neighbors 
+
+5199 samples
+   9 predictors
+   2 classes: 'Bad', 'Good' 
+
+Pre-processing: re-scaling to [0, 1] 
+Resampling: Cross-Validated (10 fold) 
+
+Summary of sample sizes: 4679, 4679, 4680, 4679, 4679, 4679, ... 
+
+Resampling results across tuning parameters:
+
+  k    Accuracy  Kappa  Accuracy SD  Kappa SD
+  3    0.752     0.46   0.0162       0.036   
+  5    0.746     0.44   0.011        0.0255  
+  7    0.751     0.45   0.02         0.0456  
+  9    0.747     0.441  0.0146       0.034   
+  11   0.746     0.44   0.0184       0.04    
+  25   0.748     0.441  0.0176       0.0404  
+  51   0.744     0.428  0.0179       0.0406  
+  101  0.742     0.418  0.0181       0.042   
+
+Accuracy was used to select the optimal model using  the largest value.
+The final value used for the model was k = 3. 
+> preds_knn = predict(results_knn, wine_test[,-10])
+> confusionMatrix(preds_knn, wine_test[,10], positive='Good')
+Confusion Matrix and Statistics
+
+          Reference
+Prediction Bad Good
+      Bad  285  162
+      Good 191  660
+                                         
+               Accuracy : 0.728          
+                 95% CI : (0.703, 0.7521)
+    No Information Rate : 0.6333         
+    P-Value [Acc > NIR] : 2.762e-13      
+                                         
+                  Kappa : 0.4069         
+ Mcnemar's Test P-Value : 0.1361         
+                                         
+            Sensitivity : 0.8029         
+            Specificity : 0.5987         
+         Pos Pred Value : 0.7756         
+         Neg Pred Value : 0.6376         
+             Prevalence : 0.6333         
+         Detection Rate : 0.5085         
+   Detection Prevalence : 0.6556         
+      Balanced Accuracy : 0.7008         
+                                         
+       'Positive' Class : Good           
+                                         
+> dotPlot(varImp(results_knn))
+Loading required package: pROC
+Type 'citation("pROC")' for a citation.
+
+Attaching package: ‘pROC’
+
+The following object is masked _by_ ‘.GlobalEnv’:
+
+    var
+
+The following objects are masked from ‘package:stats’:
+
+    cov, smooth, var
+
+> library(pROC)
+> dotPlot(varImp(results_knn))
+
